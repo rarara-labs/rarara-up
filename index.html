@@ -1093,14 +1093,47 @@ function openEditLoan(id){
   sel.innerHTML='<option value="">선택 안함</option>'+data.settings.accounts.map(a=>`<option value="${a}"${editingLoan?.account===a?' selected':''}>${a}</option>`).join('');
   openModal('loan-modal');
 }
+function syncLoanToCalendar(loan){
+  // 기존 연동 반복일정 제거 후 재생성
+  data.recurring=data.recurring.filter(r=>r.loanId!==loan.id);
+  if(loan.nextPayDate&&loan.monthlyPayment>0){
+    const day=parseInt(loan.nextPayDate.split('-')[2]);
+    data.recurring.push({
+      id:'rec_ln_'+loan.id,
+      label:loan.name+' 납입',
+      type:'loan',
+      amount:loan.monthlyPayment,
+      day,
+      account:loan.account||'',
+      note:'대출 자동 연동',
+      loanId:loan.id
+    });
+  }
+}
 function saveLoan(){
   const name=document.getElementById('ln-name').value.trim(),balance=parseFloat(document.getElementById('ln-balance').value);
   if(!name||!balance){showToast('대출명과 잔액을 입력해주세요');return;}
-  if(editingLoan){editingLoan.name=name;editingLoan.balance=balance;editingLoan.rate=parseFloat(document.getElementById('ln-rate').value)||0;editingLoan.monthlyPayment=parseFloat(document.getElementById('ln-payment').value)||0;editingLoan.nextPayDate=document.getElementById('ln-date').value;editingLoan.account=document.getElementById('ln-account').value;}
-  else data.loans.push({id:'ln_'+Date.now(),name,balance,rate:parseFloat(document.getElementById('ln-rate').value)||0,monthlyPayment:parseFloat(document.getElementById('ln-payment').value)||0,nextPayDate:document.getElementById('ln-date').value,account:document.getElementById('ln-account').value});
-  save();closeModal('loan-modal');showToast('✅ 대출 저장됐어요!');renderRepay();
+  let loan;
+  if(editingLoan){
+    editingLoan.name=name;editingLoan.balance=balance;
+    editingLoan.rate=parseFloat(document.getElementById('ln-rate').value)||0;
+    editingLoan.monthlyPayment=parseFloat(document.getElementById('ln-payment').value)||0;
+    editingLoan.nextPayDate=document.getElementById('ln-date').value;
+    editingLoan.account=document.getElementById('ln-account').value;
+    loan=editingLoan;
+  } else {
+    loan={id:'ln_'+Date.now(),name,balance,rate:parseFloat(document.getElementById('ln-rate').value)||0,monthlyPayment:parseFloat(document.getElementById('ln-payment').value)||0,nextPayDate:document.getElementById('ln-date').value,account:document.getElementById('ln-account').value};
+    data.loans.push(loan);
+  }
+  syncLoanToCalendar(loan);
+  save();closeModal('loan-modal');showToast('✅ 대출 저장 & 캘린더 연동됐어요!');renderRepay();
 }
-function deleteLoan(){if(!editingLoan)return;data.loans=data.loans.filter(l=>l.id!==editingLoan.id);save();closeModal('loan-modal');showToast('🗑️ 삭제됐어요');renderRepay();}
+function deleteLoan(){
+  if(!editingLoan)return;
+  data.recurring=data.recurring.filter(r=>r.loanId!==editingLoan.id);
+  data.loans=data.loans.filter(l=>l.id!==editingLoan.id);
+  save();closeModal('loan-modal');showToast('🗑️ 삭제됐어요');renderRepay();
+}
 
 // ════════════════════════════════════════
 // DIARY
